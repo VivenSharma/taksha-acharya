@@ -1,0 +1,97 @@
+name: Daily QC — Arjun Acharya
+
+on:
+  schedule:
+    # 01:30 UTC daily = 07:00 IST
+    - cron: '30 1 * * *'
+  workflow_dispatch:
+    inputs:
+      ping_on_success:
+        description: 'Send Telegram ping even when all checks pass (for manual verification)'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  qc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run health checks
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PING_ON_SUCCESS: ${{ inputs.ping_on_success }}
+        run: |
+          set -u
+          BASE="https://arjun-acharya-app.vercel.app"
+          FAILURES=()
+
+          check_page() {
+            local name="$1"
+            local path="$2"
+            local expected="${3:-200}"
+            local code
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$BASE$path" || echo "timeout")
+            if [[ "$code" != "$expected" ]]; then
+              FAILURES+=("$name ($path) → HTTP $code (expected $expected)")
+              echo "FAIL: $name ($path) → $code"
+            else
+              echo "OK:   $name ($path) → $code"
+            fi
+          }
+
+          check_anthropic_key_presence() {
+            # POST with trivial body. 500 = ANTHROPIC_API_KEY missing (Vercel env var dropped).
+            # 400 = handler executed (payload invalid). 429 = rate limited (still healthy).
+            local code
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+              -X POST -H "Content-Type: application/json" \
+              -d '{}' "$BASE/api/chat" || echo "timeout")
+            if [[ "$code" == "500" ]]; then
+              FAILURES+=("Chat API returned 500 — ANTHROPIC_API_KEY likely missing from Vercel env")
+              echo "FAIL: Chat API 500 — missing Anthropic key"
+            elif [[ "$code" == "400" || "$code" == "429" ]]; then
+              echo "OK:   Chat API reachable (HTTP $code — handler executed)"
+            else
+              FAILURES+=("Chat API unexpected HTTP $code on POST {}")
+              echo "FAIL: Chat API unexpected $code"
+            fi
+          }
+
+          echo "=== Arjun Acharya — Daily QC ==="
+          echo "Base URL: $BASE"
+          echo
+
+          check_page "Home"              "/"
+          check_page "Chat API (GET)"    "/api/chat"   "405"
+          check_page "Quiz API (GET)"    "/api/quiz"   "405"
+          check_page "TTS API (GET)"     "/api/tts"    "405"
+          check_anthropic_key_presence
+
+          echo
+
+          if [[ ${#FAILURES[@]} -gt 0 ]]; then
+            echo "=== ${#FAILURES[@]} failure(s) ==="
+            MSG=$(printf '🔴 Arjun Acharya daily QC: %d failure(s)\n\n' "${#FAILURES[@]}")
+            for f in "${FAILURES[@]}"; do
+              MSG+=$(printf '• %s\n' "$f")
+            done
+            MSG+=$(printf '\nRun: https://github.com/%s/actions/runs/%s\n' \
+              "${{ github.repository }}" "${{ github.run_id }}")
+
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -cn --arg cid "$TELEGRAM_CHAT_ID" --arg msg "$MSG" '{chat_id: $cid, text: $msg}')" \
+              > /dev/null
+            exit 1
+          fi
+
+          echo "=== All checks passed ==="
+          if [[ "$PING_ON_SUCCESS" == "true" ]]; then
+            MSG="✅ Arjun Acharya daily QC: all 5 checks passed at $(date -u +'%Y-%m-%d %H:%M UTC'). https://arjun-acharya-app.vercel.app"
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -cn --arg cid "$TELEGRAM_CHAT_ID" --arg msg "$MSG" '{chat_id: $cid, text: $msg}')" \
+              > /dev/null
+          fi

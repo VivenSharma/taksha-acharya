@@ -1,0 +1,16 @@
+{
+  "name": "Taksha Acharya",
+  "short_name": "Taksha",
+  "description": "Master the craft. Build with confidence.",
+  "start_url": "/learn",
+  "display": "standalone",
+  "background_color": "#FDF8F1",
+  "theme_color": "#7A4A24",
+  "icons": [
+    {
+      "src": "/brand/taksha-avatar.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

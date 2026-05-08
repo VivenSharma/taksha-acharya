@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Taksha Acharya">
+  <defs>
+    <radialGradient id="wood" cx="35%" cy="25%" r="75%">
+      <stop offset="0" stop-color="#b97a3a"/>
+      <stop offset="0.55" stop-color="#7a4a24"/>
+      <stop offset="1" stop-color="#3b2415"/>
+    </radialGradient>
+  </defs>
+  <circle cx="100" cy="100" r="96" fill="#f7efe3"/>
+  <circle cx="100" cy="100" r="86" fill="url(#wood)"/>
+  <path d="M48 127h104v15H48z" fill="#f7efe3" opacity=".95"/>
+  <path d="M62 119 115 66l17 17-53 53H62z" fill="#f7efe3"/>
+  <path d="M126 57l17-17 17 17-17 17z" fill="#d8b36a"/>
+  <path d="M57 151h86" stroke="#d8b36a" stroke-width="8" stroke-linecap="round"/>
+  <path d="M58 99c30 14 58 14 84 0" fill="none" stroke="#d8b36a" stroke-width="5" stroke-linecap="round" opacity=".75"/>
+</svg>

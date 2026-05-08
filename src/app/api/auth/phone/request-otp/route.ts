@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
 
   const acharyaId = await getAcharyaId();
   if (!acharyaId) {
-    return NextResponse.json({ error: "Acharya not configured" }, { status: 500 });
+    return NextResponse.json({ ok: true, phone, demo: true });
   }
 
   // Single query: fetch the user + verify their category has access to THIS Acharya.

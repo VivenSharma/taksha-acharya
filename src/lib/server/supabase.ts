@@ -104,6 +104,15 @@ function roleOf(key: string): string | null {
 export const effectiveKeyRole = effectiveKey ? roleOf(effectiveKey) : null;
 export const usingServiceRole = effectiveKeyRole === "service_role";
 
+export function isSupabaseSchemaExposureError(err: unknown): boolean {
+  return !!(
+    err &&
+    typeof err === "object" &&
+    "code" in err &&
+    (err as { code?: unknown }).code === "PGRST106"
+  );
+}
+
 if (dbConfigured) {
   const host = (() => { try { return new URL(url).host; } catch { return url; } })();
   if (usingServiceRole) {

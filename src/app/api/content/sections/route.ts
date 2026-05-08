@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbAcharya, dbConfigured } from "@/lib/server/supabase";
+import { dbAcharya, dbConfigured, isSupabaseSchemaExposureError } from "@/lib/server/supabase";
 import { memoCache, CONTENT_CACHE_HEADERS } from "@/lib/server/cache";
 import { getTakshaSections } from "@/lib/taksha-demo-content";
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (!dbConfigured) {
-    return NextResponse.json({ sections: getTakshaSections(moduleSlug) }, { headers: CONTENT_CACHE_HEADERS });
+    return NextResponse.json({ sections: getTakshaSections(moduleSlug, lang as "bn" | "hi" | "en") }, { headers: CONTENT_CACHE_HEADERS });
   }
 
   const cacheKey = `acharya:sections:${moduleSlug}:${lang}`;
@@ -73,6 +73,7 @@ export async function GET(req: NextRequest) {
     });
   }).catch((err) => {
     console.error("acharya sections error:", err);
+    if (isSupabaseSchemaExposureError(err)) return getTakshaSections(moduleSlug, lang as "bn" | "hi" | "en");
     return null;
   });
 

@@ -9,23 +9,29 @@ import { api } from '@/lib/api-client';
  * GET /api/content/modules. No direct Supabase in the client bundle.
  */
 export default function ModuleLoader() {
-  const { modules, setModules } = useStore();
-  const attempted = useRef(false);
+  const { lang, setModules } = useStore();
+  const inFlight = useRef(false);
+  const lastLoadedLang = useRef<string | null>(null);
 
   useEffect(() => {
-    if (modules.length > 0) return;
-    if (attempted.current) return;
-    attempted.current = true;
+    if (inFlight.current) return;
+    if (lastLoadedLang.current === lang) return;
+    inFlight.current = true;
 
     api.content.modules()
       .then((mods) => {
-        if (mods && mods.length > 0) setModules(mods);
+        if (mods && mods.length > 0) {
+          setModules(mods);
+          lastLoadedLang.current = lang;
+        }
       })
       .catch((err) => {
         console.error('Failed to load modules:', err);
-        attempted.current = false; // allow retry on next render
+      })
+      .finally(() => {
+        inFlight.current = false;
       });
-  }, [modules.length, setModules]);
+  }, [lang, setModules]);
 
   return null;
 }

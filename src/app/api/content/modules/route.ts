@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbAcharya, dbConfigured } from "@/lib/server/supabase";
+import { dbAcharya, dbConfigured, isSupabaseSchemaExposureError } from "@/lib/server/supabase";
 import { memoCache, CONTENT_CACHE_HEADERS } from "@/lib/server/cache";
 import { TAKSHA_MODULES } from "@/lib/taksha-demo-content";
 
@@ -62,6 +62,7 @@ export async function GET(req: Request) {
     });
   }).catch((err) => {
     console.error("acharya modules error:", err);
+    if (isSupabaseSchemaExposureError(err)) return TAKSHA_MODULES;
     return null;
   });
 

@@ -100,12 +100,12 @@ export default function MobileHeader({ className = "" }: Props) {
         className={`lg:hidden sticky top-0 z-30 bg-paper/95 backdrop-blur border-b border-line ${className}`}
       >
         <div className="flex items-center justify-between px-4 py-2.5">
-          <Link href="/" className="flex items-center gap-2.5 min-w-0" aria-label="Home">
+          <Link href="/" className="flex items-center gap-2.5 min-w-0" aria-label={t("home", lang)}>
             <Avatar size={32} useImage />
             <div className="leading-tight min-w-0">
-              <div className="font-serif italic text-base text-ink truncate">Taksha</div>
+              <div className="font-serif italic text-base text-ink truncate">{t("appName", lang)}</div>
               <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted truncate">
-                {currentLabel || "Carpentry Mentor"}
+                {currentLabel || t("carpentryMentor", lang)}
               </div>
             </div>
           </Link>
@@ -161,7 +161,7 @@ export default function MobileHeader({ className = "" }: Props) {
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Navigation"
+            aria-label={t("navigation", lang)}
             className="absolute right-0 top-0 bottom-0 w-[88%] max-w-sm bg-paper shadow-xl flex flex-col"
             style={{ paddingTop: "max(env(safe-area-inset-top), 0px)" }}
           >
@@ -169,16 +169,16 @@ export default function MobileHeader({ className = "" }: Props) {
               <div className="flex items-center gap-2.5">
                 <Avatar size={28} useImage />
                 <div className="leading-tight">
-                  <div className="font-serif italic text-sm text-ink">Taksha Acharya</div>
+                  <div className="font-serif italic text-sm text-ink">{t("appName", lang)}</div>
                   <div className="font-mono text-[8px] tracking-[0.18em] uppercase text-muted">
-                    Carpentry Mentor
+                    {t("carpentryMentor", lang)}
                   </div>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Close"
+                aria-label={t("close", lang)}
                 className="p-1.5 rounded-full hover:bg-cream"
               >
                 <Icon name="close" size={20} />
@@ -187,8 +187,8 @@ export default function MobileHeader({ className = "" }: Props) {
 
             <div className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
               {/* Primary nav */}
-              <nav aria-label="Primary">
-                <Tag tone="muted" className="px-2 mb-2 block">Navigation</Tag>
+              <nav aria-label={t("navigation", lang)}>
+                <Tag tone="muted" className="px-2 mb-2 block">{t("navigation", lang)}</Tag>
                 <ul className="space-y-1">
                   {TABS.map((tab) => {
                     const isActive = tab.key === active;
@@ -240,7 +240,7 @@ export default function MobileHeader({ className = "" }: Props) {
                   >
                     <span className="flex items-center gap-2 text-sm font-medium">
                       <Icon name={voiceEnabled ? "speaker" : "speakerOff"} size={18} />
-                      {voiceEnabled ? "On" : "Off"}
+                      {voiceEnabled ? t("on", lang) : t("off", lang)}
                     </span>
                     <span
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -261,7 +261,7 @@ export default function MobileHeader({ className = "" }: Props) {
                   className="flex items-center justify-between px-4 py-3 rounded-xl border border-line bg-cream text-ink hover:bg-sage transition-colors"
                 >
                   <span className="text-sm font-medium">
-                    {lang === "bn" ? "সম্পূর্ণ অরিয়েন্টেশন" : lang === "hi" ? "पूरा ओरिएंटेशन" : "Full onboarding"}
+                    {t("fullOnboarding", lang)}
                   </span>
                   <Icon name="arrowR" size={16} />
                 </Link>
@@ -270,7 +270,7 @@ export default function MobileHeader({ className = "" }: Props) {
                   onClick={() => setOpen(false)}
                   className="flex items-center justify-between px-4 py-3 rounded-xl border border-line bg-cream text-ink hover:bg-sage transition-colors"
                 >
-                  <span className="text-sm font-medium">Admin</span>
+                  <span className="text-sm font-medium">{t("admin", lang)}</span>
                   <Icon name="arrowR" size={16} />
                 </Link>
               </div>

@@ -5,6 +5,12 @@ import type { ModelMessage } from 'ai';
 import { TAKSHA_SYSTEM_PROMPT } from '@/lib/system-prompt';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
 import { logChatCall } from '@/lib/server/ai-logger';
+import {
+  GEMINI_TEXT_MODEL,
+  geminiConfigured,
+  streamGeminiText,
+  toGeminiContents,
+} from '@/lib/server/gemini';
 
 // Keep Node runtime (Anthropic SDK + ai-logger rely on node APIs) but pin the
 // deployment region to Mumbai so round-trip to Indian learners is ~20 ms
@@ -47,7 +53,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY && !geminiConfigured()) {
     return NextResponse.json({ error: 'Chat service not configured' }, { status: 500 });
   }
 
@@ -101,6 +107,57 @@ export async function POST(req: NextRequest) {
 
   const started = Date.now();
   const abortSignal = AbortSignal.timeout(25000);
+
+  if (!process.env.ANTHROPIC_API_KEY) {
+    try {
+      const res = await streamGeminiText({
+        model: GEMINI_TEXT_MODEL,
+        system: `${TAKSHA_SYSTEM_PROMPT}\n\n${systemSuffix}`,
+        contents: toGeminiContents(
+          history && Array.isArray(history)
+            ? history
+                .slice(-10)
+                .filter((h): h is { role: 'user' | 'assistant'; content: string } =>
+                  h &&
+                  (h.role === 'user' || h.role === 'assistant') &&
+                  typeof h.content === 'string' &&
+                  h.content.length <= 4000,
+                )
+            : [],
+          message,
+          image,
+        ),
+        maxOutputTokens: 900,
+        abortSignal,
+      });
+      logChatCall({
+        model: GEMINI_TEXT_MODEL,
+        status: 'ok',
+        durationMs: Date.now() - started,
+        lang,
+        moduleId,
+        hasImage: !!image,
+      });
+      return res;
+    } catch (err) {
+      const aborted = err instanceof Error && (err.name === 'AbortError' || /aborted|timeout/i.test(err.message));
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      logChatCall({
+        model: GEMINI_TEXT_MODEL,
+        status: aborted ? 'timeout' : 'error',
+        durationMs: Date.now() - started,
+        lang,
+        moduleId,
+        hasImage: !!image,
+        errorMessage,
+      });
+      console.error('Gemini chat error:', err);
+      return NextResponse.json(
+        { error: aborted ? 'Chat generation timed out.' : 'Chat generation failed' },
+        { status: aborted ? 504 : 502 },
+      );
+    }
+  }
 
   const result = streamText({
     model: anthropic(MODEL),

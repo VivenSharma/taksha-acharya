@@ -22,6 +22,9 @@ On the Vercel project `taksha-acharya-app`, Settings → Environment Variables:
 - `NEXT_PUBLIC_ACHARYA_SLUG` = `taksha`
 - `SESSION_SECRET` = any long random string (same across all instances/deploys)
 - `ANTHROPIC_API_KEY` = Anthropic API key
+- `GEMINI_API_KEY` = Gemini API key for Live voice, and chat/quiz fallback when Anthropic is not set
+- `GEMINI_LIVE_MODEL` = optional Gemini Live model override
+- `GEMINI_TEXT_MODEL` / `GEMINI_QUIZ_MODEL` = optional Gemini fallback model overrides
 - `GOOGLE_TTS_KEY` = Google Cloud TTS key
 
 ### 3. Trigger redeploy

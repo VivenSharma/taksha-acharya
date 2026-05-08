@@ -192,12 +192,17 @@ export const useStore = create<AppState>()(
     }),
     {
       name: 'taksha-acharya-store',
+      version: 2,
+      migrate: (persisted) => {
+        if (!persisted || typeof persisted !== 'object') return persisted;
+        return {
+          ...(persisted as Partial<AppState>),
+          modules: [],
+        };
+      },
       partialize: (state) => ({
         selectedModuleId: state.selectedModuleId,
         lang: state.lang,
-        // Persist modules so pages hydrate instantly on reload; ModuleLoader
-        // still refreshes in the background when the store is empty.
-        modules: state.modules,
         progress: state.progress,
         quizAttempts: state.quizAttempts,
         earnedBadges: state.earnedBadges,

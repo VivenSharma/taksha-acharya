@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbConfigured, usingServiceRole, effectiveKeyRole } from "@/lib/server/supabase";
+import { GEMINI_QUIZ_MODEL, GEMINI_TEXT_MODEL } from "@/lib/server/gemini";
 
 /**
  * Safe diagnostic endpoint — presence/length only, never the values.
@@ -10,6 +11,14 @@ export async function GET() {
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "";
   const adminPassword = process.env.ADMIN_PASSWORD || "";
   const sessionSecret = process.env.SESSION_SECRET || "";
+  const missing = [
+    !process.env.NEXT_PUBLIC_SUPABASE_URL && "NEXT_PUBLIC_SUPABASE_URL",
+    !process.env.SUPABASE_SERVICE_ROLE_KEY && "SUPABASE_SERVICE_ROLE_KEY",
+    !process.env.GEMINI_API_KEY && !process.env.ANTHROPIC_API_KEY && "GEMINI_API_KEY or ANTHROPIC_API_KEY",
+    !process.env.GOOGLE_TTS_KEY && "GOOGLE_TTS_KEY",
+    !process.env.SESSION_SECRET && "SESSION_SECRET",
+    !process.env.ADMIN_PASSWORD && "ADMIN_PASSWORD",
+  ].filter(Boolean);
 
   return NextResponse.json({
     supabase: {
@@ -39,6 +48,15 @@ export async function GET() {
       nodeEnv: process.env.NODE_ENV,
       hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
       hasGoogleTtsKey: !!process.env.GOOGLE_TTS_KEY,
+      hasGeminiKey: !!process.env.GEMINI_API_KEY,
+      geminiTextModel: GEMINI_TEXT_MODEL,
+      geminiQuizModel: GEMINI_QUIZ_MODEL,
+      aiTextProvider: process.env.ANTHROPIC_API_KEY
+        ? "anthropic"
+        : process.env.GEMINI_API_KEY
+        ? "gemini"
+        : null,
     },
+    missing,
   });
 }

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { rateLimit, rateLimitKey } from '@/lib/rate-limit';
 import { logQuizCall } from '@/lib/server/ai-logger';
 import { memoCache } from '@/lib/server/cache';
+import { GEMINI_QUIZ_MODEL, generateGeminiJson, geminiConfigured } from '@/lib/server/gemini';
 
 export const runtime = 'nodejs';
 export const preferredRegion = 'bom1';
@@ -24,6 +25,35 @@ const QuizSchema = z.object({
     })
   ).describe('Exactly 5 questions'),
 });
+
+type QuizPayload = z.infer<typeof QuizSchema>;
+
+const GeminiQuizJsonSchema = {
+  type: 'object',
+  properties: {
+    questions: {
+      type: 'array',
+      minItems: 5,
+      maxItems: 5,
+      items: {
+        type: 'object',
+        properties: {
+          q: { type: 'string', description: 'Question text, under 20 words' },
+          options: {
+            type: 'array',
+            minItems: 4,
+            maxItems: 4,
+            items: { type: 'string', description: 'Short option, under 12 words' },
+          },
+          correct: { type: 'integer', minimum: 0, maximum: 3 },
+          explanation: { type: 'string', description: 'One short sentence, under 25 words' },
+        },
+        required: ['q', 'options', 'correct', 'explanation'],
+      },
+    },
+  },
+  required: ['questions'],
+} as const;
 
 export async function POST(req: NextRequest) {
   const { moduleId, lang, completedModuleIds, learnerId } = await req.json();
@@ -50,7 +80,7 @@ export async function POST(req: NextRequest) {
       .slice(0, 40);
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
+  if (!process.env.ANTHROPIC_API_KEY && !geminiConfigured()) {
     return NextResponse.json({ error: 'Quiz service not configured' }, { status: 500 });
   }
 
@@ -106,6 +136,26 @@ Module topic mapping:
   const started = Date.now();
 
   async function runGeneration() {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      const object = await generateGeminiJson<QuizPayload>({
+        model: GEMINI_QUIZ_MODEL,
+        prompt,
+        schema: GeminiQuizJsonSchema,
+        maxOutputTokens: 2500,
+        temperature: 0.35,
+        abortSignal: controller.signal,
+      });
+      const parsed = QuizSchema.parse(object);
+      logQuizCall({
+        model: GEMINI_QUIZ_MODEL,
+        status: 'ok',
+        durationMs: Date.now() - started,
+        lang,
+        moduleId,
+      });
+      return parsed.questions;
+    }
+
     const result = await generateObject({
       model: anthropic(MODEL),
       schema: QuizSchema,
@@ -161,7 +211,7 @@ Module topic mapping:
     const aborted = err instanceof Error && (err.name === 'AbortError' || /aborted|timeout/i.test(err.message));
     const errorMessage = err instanceof Error ? err.message : String(err);
     logQuizCall({
-      model: MODEL,
+      model: process.env.ANTHROPIC_API_KEY ? MODEL : GEMINI_QUIZ_MODEL,
       status: aborted ? 'timeout' : 'error',
       durationMs: Date.now() - started,
       lang,

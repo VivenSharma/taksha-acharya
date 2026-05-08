@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbAcharya, dbConfigured } from "@/lib/server/supabase";
+import { dbAcharya, dbConfigured, isSupabaseSchemaExposureError } from "@/lib/server/supabase";
 import { memoCache, CONTENT_CACHE_HEADERS } from "@/lib/server/cache";
 
 export const runtime = "nodejs";
@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
     });
   }).catch((err) => {
     console.error("acharya videos error:", err);
+    if (isSupabaseSchemaExposureError(err)) return [];
     return null;
   });
 

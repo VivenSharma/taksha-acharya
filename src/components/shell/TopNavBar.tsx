@@ -27,18 +27,18 @@ export default function TopNavBar({ className = "" }: Props) {
     >
       <div className="flex items-center justify-between gap-4 w-full max-w-7xl mx-auto px-5 py-2.5">
         {/* Left: brand only */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label="Home">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0" aria-label={t("home", lang)}>
           <Avatar size={30} useImage />
           <div className="leading-tight hidden xl:block">
-            <div className="font-serif italic text-base text-ink">Taksha Acharya</div>
+            <div className="font-serif italic text-base text-ink">{t("appName", lang)}</div>
             <div className="font-mono text-[9px] tracking-[0.18em] uppercase text-muted">
-              Carpentry Mentor
+              {t("carpentryMentor", lang)}
             </div>
           </div>
         </Link>
 
         {/* Center: tabs */}
-        <nav aria-label="Primary" className="flex-1 min-w-0 overflow-x-auto hide-scrollbar">
+        <nav aria-label={t("navigation", lang)} className="flex-1 min-w-0 overflow-x-auto hide-scrollbar">
           <ul className="flex items-center gap-0.5 bg-cream border border-line rounded-full p-0.5 w-fit mx-auto">
             {TABS.map((tab) => {
               const isActive = tab.key === active;

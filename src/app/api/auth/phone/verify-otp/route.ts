@@ -71,7 +71,28 @@ export async function POST(req: NextRequest) {
 
   const acharyaId = await getAcharyaId();
   if (!acharyaId) {
-    return NextResponse.json({ error: "Acharya not configured" }, { status: 500 });
+    const session = {
+      learnerId: "local-taksha-demo-learner",
+      phone,
+      name: "Taksha Learner",
+      roleSlug: "learner",
+      categorySlug: "carpentry-trainee",
+      isAdmin: false,
+    };
+    const res = NextResponse.json({
+      ok: true,
+      demo: true,
+      learner: {
+        id: session.learnerId,
+        phone: session.phone,
+        name: session.name,
+        role: "user",
+        isAdmin: false,
+        preferredLang: "en",
+      },
+    });
+    setLearnerCookie(res, session);
+    return res;
   }
 
   // Fetch identity + related role / category, and verify Acharya access via

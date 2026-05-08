@@ -3,6 +3,13 @@ import type { Lang } from '../types';
 const labels = {
   // App name
   appName: { bn: 'অর্জুন আচার্য', hi: 'अर्जुन आचार्य', en: 'Taksha Acharya' },
+  carpentryMentor: { bn: 'কার্পেন্ট্রি মেন্টর', hi: 'कारपेंट्री मेंटर', en: 'Carpentry Mentor' },
+  navigation: { bn: 'নেভিগেশন', hi: 'नेविगेशन', en: 'Navigation' },
+  close: { bn: 'বন্ধ', hi: 'बंद', en: 'Close' },
+  on: { bn: 'চালু', hi: 'चालू', en: 'On' },
+  off: { bn: 'বন্ধ', hi: 'बंद', en: 'Off' },
+  fullOnboarding: { bn: 'সম্পূর্ণ পরিচিতি', hi: 'पूरा परिचय', en: 'Full onboarding' },
+  admin: { bn: 'অ্যাডমিন', hi: 'एडमिन', en: 'Admin' },
 
   // Tab names
   learn: { bn: 'শেখো', hi: 'सीखो', en: 'Learn' },

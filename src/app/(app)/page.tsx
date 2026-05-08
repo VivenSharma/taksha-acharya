@@ -111,8 +111,8 @@ export default function HomeDashboard() {
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
           <NorthStarCard num="100" label="TMIL" />
-          <NorthStarCard num="100" label="Balconies" />
-          <NorthStarCard num="10" label="Projects" />
+          <NorthStarCard num="100" label={lang === 'bn' ? 'বারান্দা' : lang === 'hi' ? 'बालकनी' : 'Balconies'} />
+          <NorthStarCard num="10" label={lang === 'bn' ? 'প্রজেক্ট' : lang === 'hi' ? 'प्रोजेक्ट' : 'Projects'} />
           <NorthStarCard num="₹25K" label={lang === 'bn' ? 'প্রতিদিন' : lang === 'hi' ? 'रोज़' : '/day'} />
         </div>
       </section>

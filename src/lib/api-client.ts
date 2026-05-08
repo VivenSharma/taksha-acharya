@@ -48,7 +48,9 @@ export class ApiError extends Error {
 // ================================================================
 const content = {
   modules: async (): Promise<Module[]> => {
-    const r = await request<{ modules: Module[] }>("/api/content/modules");
+    const r = await request<{ modules: Module[] }>(`/api/content/modules?v=${Date.now()}`, {
+      cache: "no-store",
+    });
     return r.modules;
   },
 

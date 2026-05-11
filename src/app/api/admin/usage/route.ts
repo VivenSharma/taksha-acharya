@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import fs from "node:fs";
 import { requireAdmin } from "@/lib/server/auth";
-import { db, dbConfigured } from "@/lib/server/supabase";
+import { dbGunakul, dbConfigured, getAcharyaId } from "@/lib/server/supabase";
 import { AI_LOG_FILE, type AICallLog } from "@/lib/server/ai-logger";
 
 interface Aggregate {
@@ -43,11 +43,14 @@ export async function GET() {
 
   // ---------- Primary source: Supabase ----------
   if (dbConfigured) {
-    const { data, error } = await db
-      .from("taksha_ai_usage")
+    const acharyaId = await getAcharyaId();
+    let q = dbGunakul
+      .from("log_ai_usage")
       .select("*")
       .order("ts", { ascending: false })
       .limit(5000);
+    if (acharyaId) q = q.eq("acharya_id", acharyaId);
+    const { data, error } = await q;
     if (!error && data) {
       for (const r of data) calls.push(rowToCall(r as Record<string, unknown>));
       source = "supabase";

@@ -19,6 +19,8 @@ const navItems: NavItem[] = [
   { href: '/admin',            label: 'Dashboard', icon: 'chart' },
   { href: '/admin/modules',    label: 'Modules',   icon: 'book' },
   { href: '/admin/learners',   label: 'Learners',  icon: 'user' },
+  { href: '/admin/progress',   label: 'Progress',  icon: 'target' },
+  { href: '/admin/quizzes',    label: 'Quizzes',   icon: 'quiz' },
   { href: '/admin/chat-logs',  label: 'Chat logs', icon: 'chat' },
   { href: '/admin/apply-logs', label: 'Apply logs', icon: 'hand' },
   { href: '/admin/events',     label: 'Events',    icon: 'wave' },

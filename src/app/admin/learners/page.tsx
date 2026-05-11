@@ -15,6 +15,7 @@ interface LearnerRow {
   preferred_lang: string;
   created_at: string;
   last_seen: string;
+  isActive?: boolean;
   progressCount: number;
   quizCount: number;
   avgScore: number;
@@ -26,8 +27,12 @@ export default function AdminLearnersPage() {
   const [page, setPage] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
   const [pageSize, setPageSize] = useState(50);
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [lang, setLang] = useState<'bn' | 'hi' | 'en'>('en');
+  const [message, setMessage] = useState('');
 
-  useEffect(() => {
+  function load() {
     setLoading(true);
     api.admin.learners(page)
       .then((r) => {
@@ -37,7 +42,35 @@ export default function AdminLearnersPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [page]);
+  }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [page]);
+
+  async function addUser(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage('');
+    try {
+      await api.admin.addLearner({ name, phone, preferred_lang: lang });
+      setName('');
+      setPhone('');
+      setMessage('User added. They can log in with their phone and OTP 123456.');
+      load();
+    } catch (err) {
+      setMessage(`Error: ${err instanceof Error ? err.message : 'Could not add user'}`);
+    }
+  }
+
+  async function toggleUser(id: string, isActive: boolean) {
+    await api.admin.setLearnerActive(id, !isActive);
+    load();
+  }
+
+  async function removeUser(id: string) {
+    if (!confirm('Remove this user from the app? Their old logs stay for reporting.')) return;
+    await api.admin.deleteLearner(id);
+    load();
+  }
 
   if (loading) {
     return (
@@ -58,6 +91,29 @@ export default function AdminLearnersPage() {
           </p>
         </div>
       </div>
+
+      <Card tone="surface" padding="md" className="mb-5">
+        <form onSubmit={addUser} className="grid grid-cols-1 md:grid-cols-[1fr_180px_120px_auto] gap-2 items-end">
+          <label>
+            <Tag tone="muted" className="block mb-1.5">Name</Tag>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-cream border border-line rounded-lg px-3 py-2 text-sm" placeholder="Learner name" required />
+          </label>
+          <label>
+            <Tag tone="muted" className="block mb-1.5">Phone</Tag>
+            <input value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-cream border border-line rounded-lg px-3 py-2 text-sm font-mono" placeholder="9876543210" required />
+          </label>
+          <label>
+            <Tag tone="muted" className="block mb-1.5">Lang</Tag>
+            <select value={lang} onChange={(e) => setLang(e.target.value as 'bn' | 'hi' | 'en')} className="w-full bg-cream border border-line rounded-lg px-3 py-2 text-sm">
+              <option value="en">English</option>
+              <option value="hi">Hindi</option>
+              <option value="bn">Bengali</option>
+            </select>
+          </label>
+          <Button type="submit" icon="plus">Add user</Button>
+        </form>
+        {message && <p className={`mt-3 text-xs ${message.startsWith('Error') ? 'text-terra' : 'text-forest'}`}>{message}</p>}
+      </Card>
 
       {learners.length === 0 ? (
         <Card tone="cream" padding="lg">
@@ -81,7 +137,9 @@ export default function AdminLearnersPage() {
                   <th className="text-center px-2 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase text-muted">Modules</th>
                   <th className="text-center px-2 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase text-muted">Quizzes</th>
                   <th className="text-center px-2 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase text-muted">Avg</th>
+                  <th className="text-center px-2 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase text-muted">Status</th>
                   <th className="text-right px-4 py-2.5 font-mono text-[10px] tracking-[0.18em] uppercase text-muted">Last seen</th>
+                  <th className="px-2 py-2.5" />
                 </tr>
               </thead>
               <tbody>
@@ -113,8 +171,20 @@ export default function AdminLearnersPage() {
                         <span className="text-muted">—</span>
                       )}
                     </td>
+                    <td className="text-center px-2">
+                      <Tag tone={l.isActive === false ? 'terra' : 'forest'} filled>
+                        {l.isActive === false ? 'Off' : 'Active'}
+                      </Tag>
+                    </td>
                     <td className="text-right px-4 font-mono text-[11px] text-muted">
-                      {new Date(l.last_seen).toLocaleDateString()}
+                      {l.last_seen ? new Date(l.last_seen).toLocaleDateString() : 'Never'}
+                    </td>
+                    <td className="px-2">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => location.href = `/admin/progress?learnerId=${l.id}`}>Progress</Button>
+                        <Button variant="ghost" size="sm" onClick={() => toggleUser(l.id, l.isActive !== false)}>{l.isActive === false ? 'Enable' : 'Disable'}</Button>
+                        <Button variant="danger" size="sm" icon="trash" onClick={() => removeUser(l.id)} />
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -299,6 +299,7 @@ const admin = {
         preferred_lang: string;
         created_at: string;
         last_seen: string;
+        isActive?: boolean;
         progressCount: number;
         quizCount: number;
         avgScore: number;
@@ -309,10 +310,36 @@ const admin = {
     }>(`/api/admin/learners?page=${page}`);
   },
 
+  addLearner: async (payload: { name: string; phone: string; preferred_lang: Lang }): Promise<void> => {
+    await request("/api/admin/learners", { json: payload });
+  },
+
+  setLearnerActive: async (id: string, isActive: boolean): Promise<void> => {
+    const res = await fetch("/api/admin/learners", {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, isActive }),
+    });
+    if (!res.ok) throw new ApiError(res.status, "User update failed");
+  },
+
+  deleteLearner: async (id: string): Promise<void> => {
+    const res = await fetch(`/api/admin/learners?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (!res.ok) throw new ApiError(res.status, "User delete failed");
+  },
+
   modules: async () => {
     return await request<{
       modules: Array<Module & { sectionCount: number; contentCount: number }>;
     }>("/api/admin/modules");
+  },
+
+  addModule: async (payload: Record<string, unknown>): Promise<{ id?: string }> => {
+    return await request<{ ok: true; id?: string }>("/api/admin/modules", { json: payload });
   },
 
   module: async (id: string) => {
@@ -356,6 +383,51 @@ const admin = {
     await request("/api/admin/content", {
       json: { sectionId, lang, body },
     });
+  },
+
+  quizResults: async (opts: { page?: number; learnerId?: string; moduleId?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (opts.page !== undefined) qs.set("page", String(opts.page));
+    if (opts.learnerId) qs.set("learnerId", opts.learnerId);
+    if (opts.moduleId) qs.set("moduleId", opts.moduleId);
+    return await request<{
+      rows: Array<{
+        id: string;
+        learnerId: string;
+        learnerName: string | null;
+        learnerPhone: string | null;
+        moduleId: string | null;
+        score: number;
+        total: number;
+        percent: number;
+        questions: unknown;
+        createdAt: string;
+      }>;
+      totalCount: number;
+      page: number;
+      pageSize: number;
+    }>(`/api/admin/quiz-results?${qs}`);
+  },
+
+  progress: async (opts: { learnerId?: string } = {}) => {
+    const qs = new URLSearchParams();
+    if (opts.learnerId) qs.set("learnerId", opts.learnerId);
+    return await request<{
+      rows: Array<{
+        id: string;
+        learnerId: string;
+        learnerName: string | null;
+        learnerPhone: string | null;
+        moduleId: string | null;
+        moduleTitle: string;
+        sectionsCompleted: string[];
+        completed: boolean;
+        completedAt: string | null;
+        updatedAt: string;
+        sortOrder: number;
+      }>;
+      moduleCount: number;
+    }>(`/api/admin/progress?${qs}`);
   },
 
   // List of conversations — one row per (learner, module, lang) combo.

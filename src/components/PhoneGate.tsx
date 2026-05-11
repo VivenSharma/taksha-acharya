@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { Avatar } from '@/components/ui/Avatar';
 import { api, ApiError } from '@/lib/api-client';
 import { useStore } from '@/lib/store';
@@ -18,6 +19,7 @@ import type { Lang } from '@/lib/types';
 type Step = 'phone' | 'otp';
 
 export default function PhoneGate({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const { learnerId, userPhone, setUser, clearUser, setLang, lang } = useStore();
   // `checking` is the initial session probe — until it resolves we render a
   // blank splash so we don't flash the login form for already-signed-in users.
@@ -29,9 +31,16 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [adminMode, setAdminMode] = useState(false);
+  const [adminEmail, setAdminEmail] = useState('admin@test.com');
+  const [adminPassword, setAdminPassword] = useState('admin12345');
 
   const otpInputs = useRef<Array<HTMLInputElement | null>>([]);
   const phoneInputRef = useRef<HTMLInputElement>(null);
+
+  if (pathname?.startsWith('/admin')) {
+    return <>{children}</>;
+  }
 
   // On mount, re-validate the server session cookie. If the cookie is valid,
   // zustand may or may not already have the user (first page load after a
@@ -80,7 +89,19 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (checking) {
-    return <div className="min-h-screen bg-paper" />;
+    return (
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-forest-deep p-6">
+        <div className="w-full max-w-sm bg-paper rounded-[18px] p-7 border border-line shadow-2xl flex flex-col items-center">
+          <Avatar size={64} useImage />
+          <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-gold mt-4">
+            Taksha Acharya
+          </p>
+          <h1 className="font-serif italic text-3xl text-ink mt-1">Taksha Acharya</h1>
+          <div className="w-7 h-7 border-2 border-forest border-t-transparent rounded-full animate-spin mt-6" />
+          <p className="text-xs text-muted mt-3">Opening login...</p>
+        </div>
+      </div>
+    );
   }
 
   if (learnerId && userPhone) return <>{children}</>;
@@ -130,6 +151,24 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
       setErr(e instanceof ApiError ? e.message : 'Could not verify. Try again.');
       setOtpDigits(['', '', '', '', '', '']);
       setTimeout(() => otpInputs.current[0]?.focus(), 0);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitAdmin(e: React.FormEvent) {
+    e.preventDefault();
+    await loginAdmin(adminEmail, adminPassword);
+  }
+
+  async function loginAdmin(email: string, password: string) {
+    setSubmitting(true);
+      setErr('');
+    try {
+      await api.auth.login(email, password);
+      window.location.assign('/admin');
+    } catch (e) {
+      setErr(e instanceof ApiError ? e.message : 'Admin login failed.');
     } finally {
       setSubmitting(false);
     }
@@ -188,7 +227,67 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
           <p className="text-xs text-muted mt-1">Master the craft. Build with confidence.</p>
         </div>
 
-        {step === 'phone' ? (
+        {adminMode ? (
+          <form onSubmit={submitAdmin}>
+            <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted text-center mb-3">
+              Admin login
+            </p>
+
+            <label className="block mb-3">
+              <span className="sr-only">Admin email</span>
+              <input
+                type="email"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="admin@test.com"
+                className="w-full bg-cream border border-line rounded-xl px-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20"
+                autoFocus
+                required
+              />
+            </label>
+
+            <label className="block">
+              <span className="sr-only">Admin password</span>
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="admin12345"
+                className="w-full bg-cream border border-line rounded-xl px-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20"
+                required
+              />
+            </label>
+
+            <button
+              type="submit"
+              disabled={submitting || !adminEmail.trim() || !adminPassword}
+              className="w-full mt-4 py-3 bg-forest text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
+            >
+              {submitting ? 'Signing in...' : 'Enter admin'}
+            </button>
+
+            <button
+              type="button"
+              disabled={submitting}
+              onClick={() => loginAdmin('admin@test.com', 'admin12345')}
+              className="w-full mt-2 py-3 bg-gold text-forest-deep font-semibold rounded-xl text-sm hover:bg-gold-soft disabled:opacity-50 transition-colors"
+            >
+              Continue as test admin
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setAdminMode(false); setErr(''); }}
+              className="w-full mt-2 py-2 text-muted hover:text-ink text-xs"
+            >
+              Use learner phone login
+            </button>
+
+            {err && (
+              <p className="text-terra text-xs text-center mt-3 font-medium">{err}</p>
+            )}
+          </form>
+        ) : step === 'phone' ? (
           <form onSubmit={submitPhone}>
             <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted text-center mb-3">
               Sign in with phone
@@ -223,6 +322,14 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
               className="w-full mt-4 py-3 bg-forest text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Sending…' : 'Send OTP'}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setAdminMode(true); setErr(''); }}
+              className="w-full mt-2 py-2 text-muted hover:text-ink text-xs"
+            >
+              Login as admin
             </button>
 
             {err && (

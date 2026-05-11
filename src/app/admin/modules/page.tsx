@@ -7,6 +7,7 @@ import type { Module } from '@/lib/types';
 import { Card } from '@/components/ui/Card';
 import { Tag } from '@/components/ui/Tag';
 import { Icon } from '@/components/ui/Icon';
+import { Button } from '@/components/ui/Button';
 
 interface ModuleWithCounts extends Module {
   sectionCount: number;
@@ -16,13 +17,39 @@ interface ModuleWithCounts extends Module {
 export default function AdminModulesPage() {
   const [modules, setModules] = useState<ModuleWithCounts[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [slug, setSlug] = useState('');
+  const [title, setTitle] = useState('');
+  const [group, setGroup] = useState('general');
+  const [message, setMessage] = useState('');
 
-  useEffect(() => {
+  function load() {
     api.admin.modules()
       .then((r) => setModules(r.modules))
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { load(); }, []);
+
+  async function addModule(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage('');
+    try {
+      const r = await api.admin.addModule({
+        slug,
+        title_en: title,
+        title_hi: title,
+        title_bn: title,
+        group_key: group,
+        group_label_en: group,
+        icon: 'book',
+      });
+      location.href = `/admin/modules/${r.id || slug}`;
+    } catch (err) {
+      setMessage(`Error: ${err instanceof Error ? err.message : 'Could not add module'}`);
+    }
+  }
 
   if (loading) {
     return (
@@ -40,13 +67,37 @@ export default function AdminModulesPage() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-6 flex items-end justify-between gap-4">
+        <div>
         <Tag tone="muted">Content</Tag>
         <h1 className="font-serif italic text-4xl text-forest mt-2">Modules</h1>
         <p className="text-sm text-muted mt-1">
           {modules.length} total · click a row to edit sections + content.
         </p>
+        </div>
+        <Button icon="plus" onClick={() => setShowAdd((v) => !v)}>Add module</Button>
       </div>
+
+      {showAdd && (
+        <Card tone="surface" padding="md" className="mb-5">
+          <form onSubmit={addModule} className="grid grid-cols-1 md:grid-cols-[180px_1fr_160px_auto] gap-2 items-end">
+            <label>
+              <Tag tone="muted" className="block mb-1.5">Slug</Tag>
+              <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full bg-cream border border-line rounded-lg px-3 py-2 text-sm font-mono" placeholder="m21-new-topic" required />
+            </label>
+            <label>
+              <Tag tone="muted" className="block mb-1.5">Title</Tag>
+              <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full bg-cream border border-line rounded-lg px-3 py-2 text-sm" placeholder="Module title" required />
+            </label>
+            <label>
+              <Tag tone="muted" className="block mb-1.5">Group</Tag>
+              <input value={group} onChange={(e) => setGroup(e.target.value)} className="w-full bg-cream border border-line rounded-lg px-3 py-2 text-sm" />
+            </label>
+            <Button type="submit">Create</Button>
+          </form>
+          {message && <p className="text-xs text-terra mt-3">{message}</p>}
+        </Card>
+      )}
 
       {Object.entries(grouped).map(([groupKey, mods]) => (
         <section key={groupKey} className="mb-6">

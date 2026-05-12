@@ -32,8 +32,8 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [adminMode, setAdminMode] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('admin@test.com');
-  const [adminPassword, setAdminPassword] = useState('admin12345');
+  const [adminEmail, setAdminEmail] = useState('admintest@acharya.com');
+  const [adminPassword, setAdminPassword] = useState('');
 
   const otpInputs = useRef<Array<HTMLInputElement | null>>([]);
   const phoneInputRef = useRef<HTMLInputElement>(null);
@@ -158,14 +158,10 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
 
   async function submitAdmin(e: React.FormEvent) {
     e.preventDefault();
-    await loginAdmin(adminEmail, adminPassword);
-  }
-
-  async function loginAdmin(email: string, password: string) {
     setSubmitting(true);
-      setErr('');
+    setErr('');
     try {
-      await api.auth.login(email, password);
+      await api.auth.login(adminEmail, adminPassword);
       window.location.assign('/admin');
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Admin login failed.');
@@ -264,15 +260,6 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
               className="w-full mt-4 py-3 bg-forest text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Signing in...' : 'Enter admin'}
-            </button>
-
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => loginAdmin('admin@test.com', 'admin12345')}
-              className="w-full mt-2 py-3 bg-gold text-forest-deep font-semibold rounded-xl text-sm hover:bg-gold-soft disabled:opacity-50 transition-colors"
-            >
-              Continue as test admin
             </button>
 
             <button

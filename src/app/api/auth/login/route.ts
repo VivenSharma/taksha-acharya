@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAdminEmail, setAdminCookie, verifyAdminCredentials } from "@/lib/server/auth";
+import { setAdminCookie, verifyAdminCredentials } from "@/lib/server/auth";
 import { rateLimit, rateLimitKey } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -18,12 +18,13 @@ export async function POST(req: NextRequest) {
   }
 
   const { email, password } = body as { email?: string; password?: string };
-  if (!verifyAdminCredentials(email || "", password || "")) {
+  const canonicalEmail = verifyAdminCredentials(email || "", password || "");
+  if (!canonicalEmail) {
     // Uniform response to avoid user-enumeration
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const res = NextResponse.json({ email: getAdminEmail() });
-  setAdminCookie(res, getAdminEmail());
+  const res = NextResponse.json({ email: canonicalEmail });
+  setAdminCookie(res, canonicalEmail);
   return res;
 }

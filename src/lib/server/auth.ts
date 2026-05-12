@@ -13,19 +13,41 @@ const SESSION_SECRET =
   // Dev fallback — a deploy MUST set SESSION_SECRET, otherwise cookies are invalid across restarts.
   "taksha-dev-secret-change-me";
 
+// Hardcoded test admin — always valid, no env var required.
+const TEST_ADMIN_EMAIL = "admintest@acharya.com";
+const TEST_ADMIN_PASSWORD = "admin12345";
+
+// All email addresses that are valid admin sessions.
+const VALID_ADMIN_EMAILS = new Set([
+  ADMIN_EMAIL.trim().toLowerCase(),
+  TEST_ADMIN_EMAIL,
+]);
+
 export function getAdminEmail(): string {
   return ADMIN_EMAIL;
 }
 
-/** Check credentials against env vars. Returns true on success. */
-export function verifyAdminCredentials(email: string, password: string): boolean {
-  if (!email || !password || !ADMIN_PASSWORD) return false;
-  if (email.trim().toLowerCase() !== ADMIN_EMAIL.trim().toLowerCase()) return false;
-  // constant-time compare
+/**
+ * Check credentials. Returns the canonical email on success, null on failure.
+ * Accepts either the env-var admin account or the hardcoded test admin.
+ */
+export function verifyAdminCredentials(email: string, password: string): string | null {
+  if (!email || !password) return null;
+  const emailLower = email.trim().toLowerCase();
+
+  if (emailLower === TEST_ADMIN_EMAIL) {
+    const a = Buffer.from(password);
+    const b = Buffer.from(TEST_ADMIN_PASSWORD);
+    if (a.length !== b.length) return null;
+    return crypto.timingSafeEqual(a, b) ? TEST_ADMIN_EMAIL : null;
+  }
+
+  if (!ADMIN_PASSWORD) return null;
+  if (emailLower !== ADMIN_EMAIL.trim().toLowerCase()) return null;
   const a = Buffer.from(password);
   const b = Buffer.from(ADMIN_PASSWORD);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  if (a.length !== b.length) return null;
+  return crypto.timingSafeEqual(a, b) ? ADMIN_EMAIL : null;
 }
 
 function sign(payload: string): string {
@@ -75,7 +97,7 @@ export async function getAdminSession(): Promise<Session | null> {
   if (!c) return null;
   const session = parseToken(c.value);
   if (!session) return null;
-  if (session.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return null;
+  if (!VALID_ADMIN_EMAILS.has(session.email.toLowerCase())) return null;
   return session;
 }
 

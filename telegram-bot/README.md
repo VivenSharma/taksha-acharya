@@ -12,6 +12,7 @@ SUPABASE_URL=
 SUPABASE_ANON_KEY=
 GOOGLE_AI_API_KEY=
 WEBHOOK_URL=
+ACHARYA_BASE_URL=
 ```
 
 `WEBHOOK_URL` should be the public base URL of this bot deployment, for example:
@@ -21,6 +22,14 @@ https://your-bot.example.com
 ```
 
 The bot registers `WEBHOOK_URL + /api/telegram/webhook`. If you provide the full webhook path, it uses it as-is.
+
+`ACHARYA_BASE_URL` must be the public URL of the main Acharya web app, for example:
+
+```text
+https://taksha-acharya-app.vercel.app
+```
+
+The Telegram bot uses that URL to call Acharya's existing `/api/chat`, `/api/quiz`, and `/api/content/*` endpoints.
 
 ## Supabase
 
@@ -41,7 +50,7 @@ npm install
 npm run dev
 ```
 
-If the main Acharya app is running locally at `http://localhost:3000`, the bot can call its APIs. For a public Telegram webhook in local development, expose the bot with a tunneling tool and set `WEBHOOK_URL` to that public HTTPS URL.
+If the main Acharya app is running locally at `http://localhost:3000`, set `ACHARYA_BASE_URL=http://localhost:3000`. For a public Telegram webhook in local development, expose the bot with a tunneling tool and set `WEBHOOK_URL` to that public HTTPS URL.
 
 ## Webhook Setup
 

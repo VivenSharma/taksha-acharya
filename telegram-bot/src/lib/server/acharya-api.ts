@@ -26,10 +26,10 @@ export interface QuizQuestion {
 }
 
 function acharyaBaseUrl(): string {
-  const webhookUrl = process.env.WEBHOOK_URL || "";
-  if (webhookUrl) {
+  const configuredUrl = process.env.ACHARYA_BASE_URL || "";
+  if (configuredUrl) {
     try {
-      const url = new URL(webhookUrl);
+      const url = new URL(configuredUrl);
       return url.origin;
     } catch {
       // Fall through to local default.

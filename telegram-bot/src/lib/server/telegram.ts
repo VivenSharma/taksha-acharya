@@ -16,6 +16,12 @@ export interface ReplyMarkup {
   remove_keyboard?: boolean;
 }
 
+export interface TelegramImageFile {
+  dataUrl: string;
+  contentType: string;
+  byteLength: number;
+}
+
 async function telegram(method: string, body: Record<string, unknown>) {
   if (!apiBase) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
   const res = await fetch(`${apiBase}/${method}`, {
@@ -64,18 +70,33 @@ export async function setWebhook(webhookUrl: string) {
   });
 }
 
-export async function getFileAsDataUrl(fileId: string): Promise<string | null> {
+export async function getFileAsDataUrl(fileId: string): Promise<TelegramImageFile | null> {
   if (!apiBase || !token) throw new Error("TELEGRAM_BOT_TOKEN is not configured");
   const fileRes = await telegram("getFile", { file_id: fileId }) as { result?: { file_path?: string } } | null;
   const filePath = fileRes?.result?.file_path;
   if (!filePath) return null;
   const mediaRes = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`);
   if (!mediaRes.ok) return null;
-  const contentType = mediaRes.headers.get("content-type") || "application/octet-stream";
+  const headerType = mediaRes.headers.get("content-type") || "";
+  const contentType = headerType.startsWith("image/")
+    ? headerType
+    : contentTypeFromPath(filePath) || "image/jpeg";
   const bytes = Buffer.from(await mediaRes.arrayBuffer());
   if (!contentType.startsWith("image/")) return null;
   if (bytes.byteLength > 2.5 * 1024 * 1024) return null;
-  return `data:${contentType};base64,${bytes.toString("base64")}`;
+  return {
+    dataUrl: `data:${contentType};base64,${bytes.toString("base64")}`,
+    contentType,
+    byteLength: bytes.byteLength,
+  };
+}
+
+function contentTypeFromPath(filePath: string): string | null {
+  const clean = filePath.toLowerCase().split("?")[0] || "";
+  if (clean.endsWith(".jpg") || clean.endsWith(".jpeg")) return "image/jpeg";
+  if (clean.endsWith(".png")) return "image/png";
+  if (clean.endsWith(".webp")) return "image/webp";
+  return null;
 }
 
 function chunkText(text: string, max: number): string[] {

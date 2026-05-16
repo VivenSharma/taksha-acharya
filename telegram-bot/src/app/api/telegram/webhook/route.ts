@@ -370,11 +370,21 @@ async function sendSection(chatId: number, user: TelegramUserRecord, sectionId: 
 
 async function handleChatMessage(chatId: number, user: TelegramUserRecord, message: TelegramMessage) {
   const text = (message.text || message.caption || "").trim();
-  const photo = message.photo?.slice().sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
-  const image = photo ? await getFileAsDataUrl(photo.file_id).catch(() => null) : null;
-  if (photo && !image) {
+  const photo = pickTelegramPhoto(message.photo);
+  const imageFile = photo ? await getFileAsDataUrl(photo.file_id).catch((err) => {
+    console.error("[telegram] image download failed:", err);
+    return null;
+  }) : null;
+  if (photo && !imageFile) {
     await sendMessage(chatId, "I could not read that image. Please send a smaller compressed photo and include your question as the caption.");
     return;
+  }
+  if (imageFile) {
+    console.log("[telegram] image ready", {
+      contentType: imageFile.contentType,
+      byteLength: imageFile.byteLength,
+      dataUrlLength: imageFile.dataUrl.length,
+    });
   }
 
   await sendMessage(chatId, "Thinking...");
@@ -388,7 +398,7 @@ async function handleChatMessage(chatId: number, user: TelegramUserRecord, messa
       moduleId: user.selected_module_id,
       lang: user.preferred_lang,
       learnerId: String(user.telegram_user_id),
-      image,
+      image: imageFile?.dataUrl || null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
@@ -408,6 +418,13 @@ async function handleChatMessage(chatId: number, user: TelegramUserRecord, messa
     responseTimeMs: Date.now() - started,
   });
   await sendMessage(chatId, reply, mainMenu());
+}
+
+function pickTelegramPhoto(photos?: Array<{ file_id: string; file_size?: number }>) {
+  if (!photos?.length) return null;
+  const sorted = photos.slice().sort((a, b) => (a.file_size || 0) - (b.file_size || 0));
+  return sorted.find((p) => (p.file_size || 0) > 0 && (p.file_size || 0) <= 2.5 * 1024 * 1024)
+    || sorted[0];
 }
 
 async function startQuiz(chatId: number, user: TelegramUserRecord, moduleId: string) {

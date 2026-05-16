@@ -408,6 +408,23 @@ async function handleChatMessage(chatId: number, user: TelegramUserRecord, messa
     }
     throw err;
   }
+  if (looksIncomplete(reply)) {
+    const continuation = await fetchAcharyaChat({
+      message: "Continue the previous answer from where it stopped. Do not repeat the beginning.",
+      history: [
+        ...history,
+        { role: "user", content: text || "[image submitted]" },
+        { role: "assistant", content: reply },
+      ],
+      moduleId: user.selected_module_id,
+      lang: user.preferred_lang,
+      learnerId: String(user.telegram_user_id),
+    }).catch((err) => {
+      console.warn("[telegram] continuation failed:", err);
+      return "";
+    });
+    if (continuation) reply = `${reply.trim()}\n\n${continuation.trim()}`;
+  }
 
   await appendChatLog({
     telegramUserId: user.telegram_user_id,
@@ -425,6 +442,13 @@ function pickTelegramPhoto(photos?: Array<{ file_id: string; file_size?: number 
   const sorted = photos.slice().sort((a, b) => (a.file_size || 0) - (b.file_size || 0));
   return sorted.find((p) => (p.file_size || 0) > 0 && (p.file_size || 0) <= 2.5 * 1024 * 1024)
     || sorted[0];
+}
+
+function looksIncomplete(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (/[.!?।]$/.test(trimmed)) return false;
+  return /(:|\b\d+\.|\b[•-])$/.test(trimmed) || trimmed.split(/\s+/).length < 80;
 }
 
 async function startQuiz(chatId: number, user: TelegramUserRecord, moduleId: string) {

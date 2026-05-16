@@ -372,18 +372,32 @@ async function handleChatMessage(chatId: number, user: TelegramUserRecord, messa
   const text = (message.text || message.caption || "").trim();
   const photo = message.photo?.slice().sort((a, b) => (b.file_size || 0) - (a.file_size || 0))[0];
   const image = photo ? await getFileAsDataUrl(photo.file_id).catch(() => null) : null;
+  if (photo && !image) {
+    await sendMessage(chatId, "I could not read that image. Please send a smaller compressed photo and include your question as the caption.");
+    return;
+  }
 
   await sendMessage(chatId, "Thinking...");
   const started = Date.now();
   const history = await getChatHistory(user.telegram_user_id, user.selected_module_id, user.preferred_lang);
-  const reply = await fetchAcharyaChat({
-    message: text || "[image submitted]",
-    history,
-    moduleId: user.selected_module_id,
-    lang: user.preferred_lang,
-    learnerId: String(user.telegram_user_id),
-    image,
-  });
+  let reply: string;
+  try {
+    reply = await fetchAcharyaChat({
+      message: text || "[image submitted]",
+      history,
+      moduleId: user.selected_module_id,
+      lang: user.preferred_lang,
+      learnerId: String(user.telegram_user_id),
+      image,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (/image|too large|format/i.test(message)) {
+      await sendMessage(chatId, "I could not process that image. Please send a smaller compressed photo, or ask the question as text.");
+      return;
+    }
+    throw err;
+  }
 
   await appendChatLog({
     telegramUserId: user.telegram_user_id,

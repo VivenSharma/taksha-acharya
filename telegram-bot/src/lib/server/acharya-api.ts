@@ -41,7 +41,14 @@ function acharyaBaseUrl(): string {
 async function readTextResponse(res: Response): Promise<string> {
   const text = await res.text();
   if (!res.ok) {
-    throw new Error(text.slice(0, 500) || `HTTP ${res.status}`);
+    let message = text.slice(0, 500) || `HTTP ${res.status}`;
+    try {
+      const json = JSON.parse(text) as { error?: unknown };
+      if (typeof json.error === "string" && json.error) message = json.error;
+    } catch {
+      // Keep the raw text.
+    }
+    throw new Error(message);
   }
   return text;
 }

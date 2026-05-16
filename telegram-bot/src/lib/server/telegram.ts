@@ -73,7 +73,8 @@ export async function getFileAsDataUrl(fileId: string): Promise<string | null> {
   if (!mediaRes.ok) return null;
   const contentType = mediaRes.headers.get("content-type") || "application/octet-stream";
   const bytes = Buffer.from(await mediaRes.arrayBuffer());
-  if (bytes.byteLength > 8 * 1024 * 1024) return null; // Increased to 8MB for voice
+  if (!contentType.startsWith("image/")) return null;
+  if (bytes.byteLength > 2.5 * 1024 * 1024) return null;
   return `data:${contentType};base64,${bytes.toString("base64")}`;
 }
 

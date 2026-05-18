@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGunakul, dbConfigured, getAcharyaId } from "@/lib/server/supabase";
+import { dbConfigured } from "@/lib/server/supabase";
 import { rateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { normalizeIndianPhone } from "@/lib/phone";
 import { DEV_OTP, setLearnerCookie } from "@/lib/server/phone-auth";
@@ -69,108 +69,25 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  const acharyaId = await getAcharyaId();
-  if (!acharyaId) {
-    const session = {
-      learnerId: "local-taksha-demo-learner",
-      phone,
-      name: "Taksha Learner",
-      roleSlug: "learner",
-      categorySlug: "carpentry-trainee",
-      isAdmin: false,
-    };
-    const res = NextResponse.json({
-      ok: true,
-      demo: true,
-      learner: {
-        id: session.learnerId,
-        phone: session.phone,
-        name: session.name,
-        role: "user",
-        isAdmin: false,
-        preferredLang: "en",
-      },
-    });
-    setLearnerCookie(res, session);
-    return res;
-  }
-
-  // Fetch identity + related role / category, and verify Acharya access via
-  // category_acharya_access. Supabase joins are exposed as nested objects on
-  // the response.
-  const { data, error } = await dbGunakul
-    .from("mst_users")
-    .select(`
-      id, name, preferred_lang,
-      role:mst_roles!mst_users_role_id_fkey ( slug ),
-      category:mst_categories!mst_users_category_id_fkey!inner (
-        slug,
-        map_category_acharya!inner ( acharya_id )
-      )
-    `)
-    .eq("phone", phone)
-    .eq("is_active", true)
-    .eq("is_deleted", false)
-    .eq("category.map_category_acharya.acharya_id", acharyaId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("otp-verify lookup error:", error);
-    return NextResponse.json({ error: "Service error. Try again shortly." }, { status: 502 });
-  }
-
-  if (!data) {
-    return NextResponse.json(
-      { error: "This number is not registered for the pilot." },
-      { status: 404 }
-    );
-  }
-
-  // Supabase returns nested relations as either a single object or an array
-  // depending on relationship cardinality; `maybeSingle()` with !inner joins
-  // gives us a single row but the nested relation may still come back as an
-  // array. Normalise both cases.
-  const roleSlug = (() => {
-    const r = (data as { role?: { slug?: string } | Array<{ slug?: string }> }).role;
-    if (!r) return "learner";
-    const row = Array.isArray(r) ? r[0] : r;
-    return (row?.slug as string) || "learner";
-  })();
-  const categorySlug = (() => {
-    const c = (data as { category?: { slug?: string } | Array<{ slug?: string }> }).category;
-    if (!c) return "";
-    const row = Array.isArray(c) ? c[0] : c;
-    return (row?.slug as string) || "";
-  })();
-
-  const isAdmin = roleSlug === "founder" || roleSlug === "admin";
-
-  // Fire-and-forget last_seen bump.
-  dbGunakul.from("mst_users")
-    .update({ last_seen_on: new Date().toISOString() })
-    .eq("id", data.id)
-    .then(({ error: e }) => {
-      if (e) console.warn("verify-otp last_seen update failed:", e.message);
-    });
-
+  // Testing mode: accept any phone number, grant admin access.
+  const learnerId = "test-" + phone.replace(/\D/g, "");
   const session = {
-    learnerId: data.id as string,
+    learnerId,
     phone,
-    name: (data.name as string) || "",
-    roleSlug,
-    categorySlug,
-    isAdmin,
+    name: "Test User",
+    roleSlug: "admin",
+    categorySlug: "carpentry-trainee",
+    isAdmin: true,
   };
-
   const res = NextResponse.json({
     ok: true,
     learner: {
       id: session.learnerId,
       phone: session.phone,
       name: session.name,
-      role: isAdmin ? roleSlug : "user",
-      isAdmin,
-      preferredLang: (data.preferred_lang as string) || "bn",
+      role: "admin",
+      isAdmin: true,
+      preferredLang: "en",
     },
   });
   setLearnerCookie(res, session);

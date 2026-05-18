@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  clearLearnerCookie,
-  getLearnerSession,
-} from "@/lib/server/phone-auth";
-import { dbGunakul, dbConfigured } from "@/lib/server/supabase";
+import { getLearnerSession } from "@/lib/server/phone-auth";
 
 export const runtime = "nodejs";
 export const preferredRegion = "bom1";
@@ -30,49 +26,7 @@ export async function GET() {
     return NextResponse.json({ learner: null });
   }
 
-  // Cookie is well-formed. Now verify the user it points at is still live.
-  if (!dbConfigured) {
-    return NextResponse.json({
-      learner: {
-        id: s.learnerId,
-        phone: s.phone,
-        name: s.name,
-        role: clientRole(s.roleSlug, s.isAdmin),
-        isAdmin: s.isAdmin,
-      },
-    });
-  }
-
-  const { data, error } = await dbGunakul
-    .from("mst_users")
-    .select("id")
-    .eq("id", s.learnerId)
-    .eq("is_deleted", false)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  if (error) {
-    // DB hiccup — don't nuke the user's session over a transient error.
-    console.error("[auth/me] learner lookup error:", error);
-    return NextResponse.json({
-      learner: {
-        id: s.learnerId,
-        phone: s.phone,
-        name: s.name,
-        role: clientRole(s.roleSlug, s.isAdmin),
-        isAdmin: s.isAdmin,
-      },
-    });
-  }
-
-  if (!data) {
-    // User was deleted / deactivated / the cookie references a stale id
-    // from a past schema. Evict the cookie so the client re-logs in.
-    const res = NextResponse.json({ learner: null });
-    clearLearnerCookie(res);
-    return res;
-  }
-
+  // Testing mode: trust the session cookie without a DB existence check.
   return NextResponse.json({
     learner: {
       id: s.learnerId,

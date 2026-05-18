@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { dbGunakul, dbConfigured, getAcharyaId } from "@/lib/server/supabase";
+import { dbConfigured } from "@/lib/server/supabase";
 import { rateLimit, rateLimitKey } from "@/lib/rate-limit";
 import { normalizeIndianPhone } from "@/lib/phone";
 
@@ -51,33 +51,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const acharyaId = await getAcharyaId();
-  if (!acharyaId) {
-    return NextResponse.json({ ok: true, phone, demo: true });
-  }
-
-  // Single query: fetch the user + verify their category has access to THIS Acharya.
-  // The !inner join on category_acharya_access restricts to accessible categories.
-  const { data, error } = await dbGunakul
-    .from("mst_users")
-    .select("id, category_id, mst_categories!mst_users_category_id_fkey!inner(map_category_acharya!inner(acharya_id))")
-    .eq("phone", phone)
-    .eq("is_active", true)
-    .eq("is_deleted", false)
-    .eq("mst_categories.map_category_acharya.acharya_id", acharyaId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("otp-request lookup error:", error);
-    return NextResponse.json({ error: "Service error. Try again shortly." }, { status: 502 });
-  }
-
-  if (!data) {
-    return NextResponse.json(
-      { error: "This number is not registered for the pilot. Ask your admin to add you." },
-      { status: 404 }
-    );
-  }
-
+  // Testing mode: accept any phone number without DB lookup.
   return NextResponse.json({ ok: true, phone });
 }

@@ -6,22 +6,21 @@ import { NextResponse } from "next/server";
 const COOKIE_NAME = "taksha-admin-session";
 const MAX_AGE_SECONDS = 60 * 60 * 8; // 8 hours
 
-const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || "admin@taksha.app";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const ADMIN_EMAIL = process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'acharyataksha@acharya.com';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123456';
 const SESSION_SECRET =
   process.env.SESSION_SECRET ||
   // Dev fallback — a deploy MUST set SESSION_SECRET, otherwise cookies are invalid across restarts.
-  "taksha-dev-secret-change-me";
+  'taksha-dev-secret-change-me';
 
 export function getAdminEmail(): string {
   return ADMIN_EMAIL;
 }
 
-/** Check credentials against env vars. Returns true on success. */
+/** Check credentials. Returns true on success. */
 export function verifyAdminCredentials(email: string, password: string): boolean {
-  if (!email || !password || !ADMIN_PASSWORD) return false;
+  if (!email || !password) return false;
   if (email.trim().toLowerCase() !== ADMIN_EMAIL.trim().toLowerCase()) return false;
-  // constant-time compare
   const a = Buffer.from(password);
   const b = Buffer.from(ADMIN_PASSWORD);
   if (a.length !== b.length) return false;
@@ -75,7 +74,8 @@ export async function getAdminSession(): Promise<Session | null> {
   if (!c) return null;
   const session = parseToken(c.value);
   if (!session) return null;
-  if (session.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()) return null;
+  const emailNorm = session.email.toLowerCase();
+  if (emailNorm !== ADMIN_EMAIL.toLowerCase()) return null;
   return session;
 }
 

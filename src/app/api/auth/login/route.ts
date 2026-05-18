@@ -23,7 +23,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const res = NextResponse.json({ email: getAdminEmail() });
-  setAdminCookie(res, getAdminEmail());
+  // Stamp the cookie with the email that was actually submitted so the admin
+  // sidebar shows the right address (important when using the test account).
+  const authedEmail = (email || "").trim().toLowerCase() || getAdminEmail();
+  const res = NextResponse.json({ email: authedEmail });
+  setAdminCookie(res, authedEmail);
   return res;
 }

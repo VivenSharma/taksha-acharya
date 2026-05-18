@@ -101,7 +101,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Tag tone="muted" className="block mb-1.5">Email</Tag>
             <input
               type="email"
-              placeholder="you@example.com"
+              placeholder="acharyataksha@acharya.com"
               value={loginEmail}
               onChange={(e) => setLoginEmail(e.target.value)}
               className="w-full bg-cream border border-line rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-forest/30 focus:border-forest placeholder:text-muted"

@@ -9,11 +9,10 @@ import { formatIndianPhone, normalizeIndianPhone } from '@/lib/phone';
 import type { Lang } from '@/lib/types';
 
 /**
- * Two-step phone + OTP gate. Replaces the old PIN gate.
- *
- * Pilot mode: the OTP is always 123456 and is shown as a hint on the OTP
- * screen. The security gate is really the phone allow-list on the server —
- * local demo mode accepts any valid Indian mobile number.
+ * Two-step phone + OTP gate for learners.
+ * Admin login is integrated directly below the phone form — same screen,
+ * no separate toggle. Email: acharyataksha@acharya.com / Password: 123456
+ * will redirect to /admin.
  */
 
 type Step = 'phone' | 'otp';
@@ -21,36 +20,36 @@ type Step = 'phone' | 'otp';
 export default function PhoneGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { learnerId, userPhone, setUser, clearUser, setLang, lang } = useStore();
-  // `checking` is the initial session probe — until it resolves we render a
-  // blank splash so we don't flash the login form for already-signed-in users.
+
   const [checking, setChecking] = useState(true);
   const [step, setStep] = useState<Step>('phone');
 
+  // Learner phone login
   const [phoneInput, setPhoneInput] = useState('');
   const [normalizedPhone, setNormalizedPhone] = useState<string>('');
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
   const [err, setErr] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [adminMode, setAdminMode] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('admin@test.com');
-  const [adminPassword, setAdminPassword] = useState('admin12345');
+
+  // Admin email/password (integrated, always visible below the divider)
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminErr, setAdminErr] = useState('');
+  const [adminSubmitting, setAdminSubmitting] = useState(false);
 
   const otpInputs = useRef<Array<HTMLInputElement | null>>([]);
   const phoneInputRef = useRef<HTMLInputElement>(null);
 
+  // Admin routes skip the gate entirely.
   if (pathname?.startsWith('/admin')) {
     return <>{children}</>;
   }
 
-  // On mount, re-validate the server session cookie. If the cookie is valid,
-  // zustand may or may not already have the user (first page load after a
-  // reload wipes the in-memory store) — hydrate it from /me if needed.
+  // On mount, re-validate the server session cookie.
   useEffect(() => {
     let cancelled = false;
     async function probe() {
       if (learnerId && userPhone) {
-        // Trust the persisted store on a warm reload. The cookie is still
-        // validated on every API call, so staleness can't escalate access.
         setChecking(false);
         return;
       }
@@ -69,14 +68,9 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
             setLang(me.preferredLang as Lang);
           }
         } else {
-          // Server says no valid session — purge any stale identity that
-          // localStorage might be persisting. Prevents fire-and-forget
-          // calls (events, init, sync) from being rejected 401 before the
-          // user has logged in fresh.
           clearUser();
         }
       } catch {
-        /* treat any error as signed-out — keep the phone form visible */
         clearUser();
       } finally {
         if (!cancelled) setChecking(false);
@@ -84,7 +78,6 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
     }
     probe();
     return () => { cancelled = true; };
-    // Intentionally run only on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -106,6 +99,7 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
 
   if (learnerId && userPhone) return <>{children}</>;
 
+  // ── Learner handlers ────────────────────────────────────────────
   async function submitPhone(e: React.FormEvent) {
     e.preventDefault();
     setErr('');
@@ -120,7 +114,6 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
       setNormalizedPhone(normalized);
       setStep('otp');
       setOtpDigits(['', '', '', '', '', '']);
-      // Focus the first OTP box on the next tick.
       setTimeout(() => otpInputs.current[0]?.focus(), 50);
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Something went wrong. Try again.');
@@ -156,24 +149,23 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
     }
   }
 
+  // ── Admin handler ───────────────────────────────────────────────
   async function submitAdmin(e: React.FormEvent) {
     e.preventDefault();
-    await loginAdmin(adminEmail, adminPassword);
-  }
-
-  async function loginAdmin(email: string, password: string) {
-    setSubmitting(true);
-      setErr('');
+    setAdminErr('');
+    if (!adminEmail.trim() || !adminPassword) return;
+    setAdminSubmitting(true);
     try {
-      await api.auth.login(email, password);
+      await api.auth.login(adminEmail.trim(), adminPassword);
       window.location.assign('/admin');
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'Admin login failed.');
+      setAdminErr(e instanceof ApiError ? e.message : 'Admin login failed. Check credentials.');
     } finally {
-      setSubmitting(false);
+      setAdminSubmitting(false);
     }
   }
 
+  // ── OTP helpers ─────────────────────────────────────────────────
   function setOtpDigitAt(idx: number, value: string) {
     const v = value.replace(/\D/g, '').slice(-1);
     setOtpDigits((prev) => {
@@ -182,7 +174,6 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
       return next;
     });
     if (v && idx < 5) otpInputs.current[idx + 1]?.focus();
-    // Auto-submit when all 6 filled (trigger after React flushes state).
     if (v && idx === 5) {
       setTimeout(() => {
         const full = otpDigits.slice();
@@ -212,12 +203,11 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
     if (text.length === 6) setTimeout(() => submitOtp(), 0);
   }
 
-  // ------------------------------------------------------------------
-  // Rendering
-  // ------------------------------------------------------------------
+  // ── Render ──────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-forest-deep p-6">
       <div className="w-full max-w-sm bg-paper rounded-[18px] p-7 border border-line shadow-2xl">
+        {/* Header */}
         <div className="flex flex-col items-center mb-6">
           <Avatar size={64} useImage />
           <p className="font-mono text-[10px] tracking-[0.22em] uppercase text-gold mt-4">
@@ -227,120 +217,8 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
           <p className="text-xs text-muted mt-1">Master the craft. Build with confidence.</p>
         </div>
 
-        {adminMode ? (
-          <form onSubmit={submitAdmin}>
-            <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted text-center mb-3">
-              Admin login
-            </p>
-
-            <label className="block mb-3">
-              <span className="sr-only">Admin email</span>
-              <input
-                type="email"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="admin@test.com"
-                className="w-full bg-cream border border-line rounded-xl px-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20"
-                autoFocus
-                required
-              />
-            </label>
-
-            <label className="block">
-              <span className="sr-only">Admin password</span>
-              <input
-                type="password"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="admin12345"
-                className="w-full bg-cream border border-line rounded-xl px-3 py-3 text-sm text-ink focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20"
-                required
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={submitting || !adminEmail.trim() || !adminPassword}
-              className="w-full mt-4 py-3 bg-forest text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
-            >
-              {submitting ? 'Signing in...' : 'Enter admin'}
-            </button>
-
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={() => loginAdmin('admin@test.com', 'admin12345')}
-              className="w-full mt-2 py-3 bg-gold text-forest-deep font-semibold rounded-xl text-sm hover:bg-gold-soft disabled:opacity-50 transition-colors"
-            >
-              Continue as test admin
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setAdminMode(false); setErr(''); }}
-              className="w-full mt-2 py-2 text-muted hover:text-ink text-xs"
-            >
-              Use learner phone login
-            </button>
-
-            {err && (
-              <p className="text-terra text-xs text-center mt-3 font-medium">{err}</p>
-            )}
-          </form>
-        ) : step === 'phone' ? (
-          <form onSubmit={submitPhone}>
-            <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted text-center mb-3">
-              Sign in with phone
-            </p>
-
-            <label className="block">
-              <span className="sr-only">Mobile number</span>
-              <div className="flex items-stretch bg-cream border border-line rounded-xl overflow-hidden focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/20">
-                <span className="px-3 flex items-center font-mono text-sm text-muted border-r border-line">
-                  +91
-                </span>
-                <input
-                  ref={phoneInputRef}
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  pattern="[0-9 ]*"
-                  maxLength={15}
-                  autoFocus
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  placeholder="90628 39387"
-                  className="flex-1 bg-transparent px-3 py-3 font-mono text-[15px] text-ink placeholder:text-muted focus:outline-none"
-                  aria-label="Mobile number"
-                />
-              </div>
-            </label>
-
-            <button
-              type="submit"
-              disabled={submitting || !phoneInput.trim()}
-              className="w-full mt-4 py-3 bg-forest text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
-            >
-              {submitting ? 'Sending…' : 'Send OTP'}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => { setAdminMode(true); setErr(''); }}
-              className="w-full mt-2 py-2 text-muted hover:text-ink text-xs"
-            >
-              Login as admin
-            </button>
-
-            {err && (
-              <p className="text-terra text-xs text-center mt-3 font-medium">{err}</p>
-            )}
-
-            <p className="mt-6 text-center font-mono text-[9px] tracking-[0.22em] uppercase text-muted">
-              v1 · {lang.toUpperCase()} · April 2026
-            </p>
-          </form>
-        ) : (
+        {/* ── OTP step ─────────────────────────────────────────── */}
+        {step === 'otp' ? (
           <form onSubmit={submitOtp}>
             <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted text-center mb-1">
               Enter OTP
@@ -393,6 +271,108 @@ export default function PhoneGate({ children }: { children: React.ReactNode }) {
               <p className="text-terra text-xs text-center mt-3 font-medium">{err}</p>
             )}
           </form>
+
+        ) : (
+          /* ── Phone + Admin (same screen) ─────────────────────── */
+          <>
+            {/* Learner phone login */}
+            <form onSubmit={submitPhone} id="phone-login-form">
+              <p className="font-mono text-[10px] tracking-[0.18em] uppercase text-muted text-center mb-3">
+                Sign in with phone
+              </p>
+
+              <label className="block">
+                <span className="sr-only">Mobile number</span>
+                <div className="flex items-stretch bg-cream border border-line rounded-xl overflow-hidden focus-within:border-forest focus-within:ring-2 focus-within:ring-forest/20">
+                  <span className="px-3 flex items-center font-mono text-sm text-muted border-r border-line">
+                    +91
+                  </span>
+                  <input
+                    ref={phoneInputRef}
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    pattern="[0-9 ]*"
+                    maxLength={15}
+                    autoFocus
+                    value={phoneInput}
+                    onChange={(e) => setPhoneInput(e.target.value)}
+                    placeholder="90628 39387"
+                    className="flex-1 bg-transparent px-3 py-3 font-mono text-[15px] text-ink placeholder:text-muted focus:outline-none"
+                    aria-label="Mobile number"
+                  />
+                </div>
+              </label>
+
+              <button
+                type="submit"
+                disabled={submitting || !phoneInput.trim()}
+                className="w-full mt-4 py-3 bg-forest text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
+              >
+                {submitting ? 'Sending…' : 'Send OTP'}
+              </button>
+
+              {err && (
+                <p className="text-terra text-xs text-center mt-3 font-medium">{err}</p>
+              )}
+            </form>
+
+            {/* Divider */}
+            <div className="flex items-center gap-3 my-5">
+              <div className="flex-1 h-px bg-line" />
+              <span className="text-[10px] font-mono tracking-[0.18em] uppercase text-muted">
+                Admin
+              </span>
+              <div className="flex-1 h-px bg-line" />
+            </div>
+
+            {/* Admin email/password login — integrated, no toggle */}
+            <form onSubmit={submitAdmin} id="admin-login-form">
+              <label className="block mb-3">
+                <span className="sr-only">Admin email</span>
+                <input
+                  type="email"
+                  id="admin-email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="acharyataksha@acharya.com"
+                  className="w-full bg-cream border border-line rounded-xl px-3 py-2.5 text-sm text-ink focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20 placeholder:text-muted"
+                  autoComplete="email"
+                  required
+                />
+              </label>
+
+              <label className="block mb-3">
+                <span className="sr-only">Admin password</span>
+                <input
+                  type="password"
+                  id="admin-password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-cream border border-line rounded-xl px-3 py-2.5 text-sm text-ink font-mono focus:outline-none focus:border-forest focus:ring-2 focus:ring-forest/20 placeholder:text-muted"
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+
+              {adminErr && (
+                <p className="text-terra text-xs text-center mb-3 font-medium">{adminErr}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={adminSubmitting || !adminEmail.trim() || !adminPassword}
+                className="w-full py-2.5 bg-ink text-cream font-semibold rounded-xl text-sm hover:bg-forest-deep disabled:opacity-50 transition-colors"
+              >
+                {adminSubmitting ? 'Signing in…' : 'Enter Admin Dashboard'}
+              </button>
+            </form>
+
+            <p className="mt-5 text-center font-mono text-[9px] tracking-[0.22em] uppercase text-muted">
+              v1 · {lang.toUpperCase()} · April 2026
+            </p>
+          </>
         )}
       </div>
     </div>

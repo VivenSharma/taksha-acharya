@@ -69,15 +69,15 @@ export async function POST(req: NextRequest) {
     return res;
   }
 
-  // Testing mode: accept any phone number, grant admin access.
+  // Testing mode: accept any phone number as a regular learner.
   const learnerId = "test-" + phone.replace(/\D/g, "");
   const session = {
     learnerId,
     phone,
-    name: "Test User",
-    roleSlug: "admin",
+    name: "Learner",
+    roleSlug: "learner",
     categorySlug: "carpentry-trainee",
-    isAdmin: true,
+    isAdmin: false,
   };
   const res = NextResponse.json({
     ok: true,
@@ -85,8 +85,8 @@ export async function POST(req: NextRequest) {
       id: session.learnerId,
       phone: session.phone,
       name: session.name,
-      role: "admin",
-      isAdmin: true,
+      role: "user",
+      isAdmin: false,
       preferredLang: "en",
     },
   });
